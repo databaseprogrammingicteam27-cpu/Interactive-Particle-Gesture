@@ -18,8 +18,9 @@ input[type=color]{width:44px;height:28px;border:1px solid var(--line);border-rad
 .btn{padding:7px 10px;background:transparent;color:var(--fg);border:1px solid var(--line);border-radius:9px;cursor:pointer;font:inherit}
 .btn:hover{background:rgba(255,255,255,.08)}
 .top{position:fixed;right:14px;top:calc(14px + env(safe-area-inset-top,0px));display:flex;gap:8px}
+#wm{position:fixed;right:16px;bottom:calc(12px + env(safe-area-inset-bottom,0px));width:200px;height:40px;pointer-events:none}
 #status{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));padding:7px 14px;background:var(--panel);border:1px solid var(--line);border-radius:99px;color:var(--mut);white-space:nowrap}
-#cam{position:fixed;right:14px;bottom:calc(60px + env(safe-area-inset-bottom,0px));width:150px;border-radius:10px;border:1px solid var(--line);transform:scaleX(-1);display:none;opacity:.8}
+#cam{position:fixed;right:14px;bottom:calc(70px + env(safe-area-inset-bottom,0px));width:150px;border-radius:10px;border:1px solid var(--line);transform:scaleX(-1);display:none;opacity:.8}
 .hint{margin-top:10px;font-size:11px;color:var(--mut)}
 @media(max-width:560px){.panel{width:170px;padding:10px}}
 </style></head><body>
@@ -32,6 +33,7 @@ input[type=color]{width:44px;height:28px;border:1px solid var(--line);border-rad
   <p class="hint">Keys 1–5 also switch pattern. Hand open/close controls size &amp; dispersion.</p>
 </div>
 <div class="top"><button class="btn" id="camBtn">Enable camera</button><button class="btn" id="fs">Fullscreen</button></div>
+<canvas id="wm"></canvas>
 <div id="status">Camera off — use the panel or keys 1–5</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -39,11 +41,11 @@ input[type=color]{width:44px;height:28px;border:1px solid var(--line);border-rad
 <script>
 const N=22000;
 const SHAPES=[
- {id:'sun',name:'Sun / Planet',hint:'fist'},
- {id:'spread',name:'Scatter',hint:'palm'},
- {id:'heart',name:'Heart',hint:'1 finger'},
- {id:'saturn',name:'Saturn',hint:'2 fingers'},
- {id:'hole',name:'Black hole',hint:'3 fingers'}];
+ {id:'sun',name:'Sun / Planet',hint:'fist (Kepalin Tangan)'},
+ {id:'spread',name:'Scatter',hint:'palm (Buka Tangan/Tangan Terbuka)'},
+ {id:'heart',name:'Heart',hint:'1 finger (Jari Telunjuk/Satu Jari)'},
+ {id:'saturn',name:'Saturn',hint:'2 fingers (Dua Jari)'},
+ {id:'hole',name:'Black hole',hint:'3 fingers (Tiga Jari)'}];
 const canvas=document.getElementById('c');
 const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));
@@ -147,4 +149,29 @@ function frame(now){
  group.rotation.x=hole?.5:(shape==='saturn'?.25:0);
  renderer.render(scene,cam);requestAnimationFrame(frame)}
 requestAnimationFrame(frame);
+
+// ---- watermark: typing text made of white particles ----
+(function(){
+ const cv=document.getElementById('wm'),cx=cv.getContext('2d'),TXT='Fakhri Zabir',W=200,H=40,dpr=Math.min(devicePixelRatio||1,2);
+ cv.width=W*dpr;cv.height=H*dpr;
+ const off=document.createElement('canvas');off.width=W*dpr;off.height=H*dpr;const oc=off.getContext('2d');
+ oc.scale(dpr,dpr);oc.font='600 20px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';oc.textBaseline='middle';
+ const full=oc.measureText(TXT).width,sx=W-full-12;oc.fillStyle='#fff';oc.fillText(TXT,sx,H/2);
+ const img=oc.getImageData(0,0,off.width,off.height).data,step=Math.max(2,Math.round(1.6*dpr)),pts=[];
+ for(let y=0;y<off.height;y+=step)for(let x=0;x<off.width;x+=step)if(img[(y*off.width+x)*4+3]>140)pts.push({x:x/dpr,y:y/dpr,ph:Math.random()*6.28,b:-1,dx:Math.random()*2-1,dy:Math.random()*2-1});
+ const bx=[sx];for(let i=1;i<=TXT.length;i++)bx.push(sx+oc.measureText(TXT.slice(0,i)).width);
+ const ctx2=cx;let T0=performance.now();
+ function draw(now){
+  const t=(now-T0)/1000%10.5;let n;
+  if(t<.6)n=0;else if(t<9)n=Math.min(TXT.length,Math.floor((t-.6)/.13)+1);else n=Math.max(0,TXT.length-Math.floor((t-9)/.05));
+  const bound=bx[n],s=now/1000;
+  ctx2.setTransform(dpr,0,0,dpr,0,0);ctx2.clearRect(0,0,W,H);ctx2.fillStyle='#fff';
+  for(const p of pts){
+   if(p.x>bound+.5){p.b=-1;continue}
+   if(p.b<0)p.b=s;const e=Math.min(1,(s-p.b)/.35),k=1-e*e*(3-2*e),a=Math.min(1,e*1.5)*(.72+.28*Math.sin(s*3+p.ph));
+   ctx2.globalAlpha=a;ctx2.fillRect(p.x+p.dx*10*k+Math.sin(s*2+p.ph)*.25,p.y+p.dy*10*k+Math.cos(s*2.3+p.ph)*.25,1.15,1.15)}
+  if(Math.floor(s*2.2)%2===0){ctx2.globalAlpha=.9;for(let y=H/2-10;y<=H/2+10;y+=2.4)ctx2.fillRect(bound+3,y,1.3,1.3)}
+  ctx2.globalAlpha=1;requestAnimationFrame(draw)}
+ requestAnimationFrame(draw);
+})();
 </script></body></html>
